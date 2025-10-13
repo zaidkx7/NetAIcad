@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>netAIcad | AI Powered Netacad Quiz Helper</title>
+  <style>
+    body {
+      width: 350px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+      color: #333;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #555;
+    }
+    select, input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    input[type="password"] {
+      font-family: monospace;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    button:hover {
+      background-color: #0052a3;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      display: none;
+    }
+    .status.success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status.error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .info {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+    .instructions {
+      background-color: #f8f9fa;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #555;
+      margin-top: 15px;
+    }
+    .instructions strong {
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h2>🤖 netAIcad | AI Powered Netacad Quiz Helper</h2>
+
+  <div class="section">
+    <label for="simpleModel">Simple Questions Model:</label>
+    <select id="simpleModel">
+      <option value="">-- Select Model --</option>
+      <optgroup label="Legacy Providers (Use existing API Key)">
+        <option value="groq">Groq (Llama 3.3 - Fast & Free)</option>
+        <option value="gemini">Google Gemini (Free)</option>
+      </optgroup>
+      <optgroup label="OpenRouter Models (Requires OpenRouter API Key)">
+        <option value="DeepSeek">DeepSeek v3.2</option>
+        <option value="Qwen3 Coder Flash">Qwen3 Coder Flash</option>
+      </optgroup>
+    </select>
+    <div class="info">For general questions, trivia, and non-technical content</div>
+  </div>
+
+  <div class="section">
+    <label for="codingModel">Advanced (Coding/Math) Model:</label>
+    <select id="codingModel">
+      <option value="">-- Select Model --</option>
+      <optgroup label="OpenRouter Models (Requires OpenRouter API Key)">
+        <option value="Claude Sonnet 4.5">Claude Sonnet 4.5</option>
+        <option value="GPT-5 Pro">GPT-5 Pro</option>
+        <option value="GPT-5 Codex">GPT-5 Codex</option>
+        <option value="Qwen3 Coder Plus">Qwen3 Coder Plus</option>
+        <option value="Grok 4 Fast">Grok 4 Fast</option>
+        <option value="GLM">GLM 4.6</option>
+      </optgroup>
+    </select>
+    <div class="info">For programming, mathematics, and technical questions</div>
+  </div>
+
+  <div class="section">
+    <label for="openRouterApiKey">OpenRouter API Key:</label>
+    <input type="password" id="openRouterApiKey" placeholder="Enter OpenRouter API key (if using OpenRouter models)">
+    <div class="info">
+      Get your free API key from: <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a>
+    </div>
+  </div>
+
+  <div class="section">
+    <label for="apiKey">Legacy Provider API Key:</label>
+    <input type="password" id="apiKey" placeholder="For Groq/Gemini only">
+    <div class="info" id="apiInfo">
+      <strong>Groq:</strong> <a href="https://console.groq.com/keys" target="_blank">Get Key</a> | 
+      <strong>Gemini:</strong> <a href="https://makersuite.google.com/app/apikey" target="_blank">Get Key</a>
+    </div>
+  </div>
+
+  <button id="saveBtn">Save Settings</button>
+
+  <div class="status" id="status"></div>
+
+  <div class="instructions">
+    <strong>How to use:</strong><br>
+    1. Select models for simple and advanced questions<br>
+    2. Enter the required API key(s)<br>
+    3. Click Save Settings<br>
+    4. Go to a Netacad quiz page<br>
+    5. Use the <strong>green button</strong> for general questions<br>
+    6. Use the <strong>red button</strong> for coding/math questions
+  </div>
+
+  <div class="info">Created by <a href="https://zaid.sh" target="_blank">Muhammad Zaid 😎</a></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
