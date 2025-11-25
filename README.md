@@ -8,6 +8,7 @@
   - **OpenAI GPT-4o Mini** - Fast and accurate for all question types
   - **Google Gemini 2.5 Flash** - Free tier available, great performance
 - 🎯 Automatic question and option extraction from Netacad quizzes
+- ✅ **Multiple-answer support** - Works with checkbox questions (choose two, choose three, etc.)
 - ✨ Visual highlighting of suggested correct answers
 - 🔐 Secure API key storage
 - 🎨 Clean and intuitive dual-button UI (GPT and Gemini buttons)
@@ -64,8 +65,17 @@
    - **🤖 Get Answer from GPT** (Blue) - Uses OpenAI GPT-4o Mini
    - **✨ Get Answer from Gemini** (Purple) - Uses Google Gemini 2.5 Flash
 3. Click the button for the AI provider you want to use
-4. The extension will highlight the AI-suggested correct answer
+4. The extension will highlight the AI-suggested correct answer(s)
+   - For single-answer questions (radio buttons): One option is highlighted
+   - For multiple-answer questions (checkboxes): Multiple options are highlighted
 5. Review the suggestion and make your selection
+
+### Multiple-Answer Questions
+
+The extension automatically detects when a question requires multiple answers (checkboxes instead of radio buttons) and will:
+- Analyze the question text to determine how many answers are needed (e.g., "choose two", "select three")
+- Request the correct number of answers from the AI
+- Highlight all suggested correct answers in green
 
 ### Which Provider to Use? 🤔
 
@@ -138,10 +148,11 @@ Below are some screenshots demonstrating the extension in action:
 1. **Content Script** (`content.js`) runs on Netacad pages and detects quiz elements using Shadow DOM
 2. Netacad uses Shadow DOM to encapsulate quiz content, so the script accesses the `mcq-view` element's shadow root
 3. The script extracts question text and options from inside the shadow DOM
-4. User clicks either the **blue button** (GPT) or **purple button** (Gemini)
-5. **Background Script** (`background.js`) sends the question to the selected AI provider (OpenAI or Google)
-6. The AI responds with only the correct option letter (A, B, C, or D)
-7. The extension highlights the corresponding option with inline styles (since CSS doesn't penetrate Shadow DOM)
+4. The script detects if the question requires multiple answers (checkbox vs radio button)
+5. User clicks either the **blue button** (GPT) or **purple button** (Gemini)
+6. **Background Script** (`background.js`) sends the question to the selected AI provider (OpenAI or Google) with info about whether multiple answers are needed
+7. The AI responds with the correct option letter(s) (e.g., "A" for single answer, or "A,B" for multiple answers)
+8. The extension highlights the corresponding option(s) with inline styles (since CSS doesn't penetrate Shadow DOM)
 
 ## Files
 
@@ -166,8 +177,9 @@ Below are some screenshots demonstrating the extension in action:
 - **Affordable/FREE options**:
   - **Gemini**: Free tier with generous limits (⭐ Recommended to start)
   - **OpenAI**: Very affordable pay-as-you-go pricing
-- Only works on multiple-choice questions
+- Works with multiple-choice questions (single and multiple answers)
 - Both models work well for all question types
+- The extension tries to auto-detect the number of required answers, but may default to 2 if unclear
 
 ## Troubleshooting
 

@@ -249,11 +249,68 @@ async function extractQuestionData() {
       };
     });
 
+    // Detect if this is a multiple-answer question (checkbox)
+    // Check for checkbox input type
+    const firstOption = mcqView.querySelector('.mcq__item');
+    let isMultipleAnswer = false;
+    let requiredAnswers = 1;
+
+    if (firstOption) {
+      // Look for input type (checkbox vs radio)
+      const inputElement = firstOption.querySelector('input[type="checkbox"]');
+      if (inputElement) {
+        isMultipleAnswer = true;
+        console.log('✅ Detected CHECKBOX question (multiple answers possible)');
+      } else {
+        console.log('✅ Detected RADIO question (single answer)');
+      }
+    }
+
+    // Try to detect number of required answers from question text
+    if (isMultipleAnswer) {
+      const questionLower = questionText.toLowerCase();
+
+      // Match patterns like "choose two", "select three", "choose 2", etc.
+      const patterns = [
+        /choose\s+(two|three|four|five|2|3|4|5)/i,
+        /select\s+(two|three|four|five|2|3|4|5)/i,
+        /pick\s+(two|three|four|five|2|3|4|5)/i,
+        /identify\s+(two|three|four|five|2|3|4|5)/i
+      ];
+
+      const numberMap = {
+        'two': 2, '2': 2,
+        'three': 3, '3': 3,
+        'four': 4, '4': 4,
+        'five': 5, '5': 5
+      };
+
+      for (const pattern of patterns) {
+        const match = questionLower.match(pattern);
+        if (match && match[1]) {
+          const num = numberMap[match[1].toLowerCase()];
+          if (num) {
+            requiredAnswers = num;
+            console.log(`✅ Detected ${requiredAnswers} required answers from question text`);
+            break;
+          }
+        }
+      }
+
+      // If still couldn't detect, default to 2 for checkbox questions
+      if (requiredAnswers === 1) {
+        requiredAnswers = 2;
+        console.log('⚠️ Could not detect number of answers, defaulting to 2');
+      }
+    }
+
     console.log('=== Extraction Complete ===\n');
 
     return {
       question: questionText,
-      options: options
+      options: options,
+      isMultipleAnswer: isMultipleAnswer,
+      requiredAnswers: requiredAnswers
     };
 
   } catch (error) {
@@ -262,10 +319,14 @@ async function extractQuestionData() {
   }
 }
 
-// Function to highlight the correct answer
-function highlightCorrectAnswer(correctOptionIndex) {
+// Function to highlight the correct answer(s)
+// correctOptionIndices can be a single index or an array of indices
+function highlightCorrectAnswer(correctOptionIndices) {
   console.log('=== Starting Highlight ===');
-  console.log('Highlighting option index:', correctOptionIndex);
+
+  // Normalize to array
+  const indices = Array.isArray(correctOptionIndices) ? correctOptionIndices : [correctOptionIndices];
+  console.log('Highlighting option indices:', indices);
 
   try {
     // Find ALL mcq-view elements and pick the visible/active one (same as extraction)
@@ -357,28 +418,30 @@ function highlightCorrectAnswer(correctOptionIndex) {
       });
     });
 
-    // Highlight the correct answer
-    if (correctOptionIndex >= 0 && correctOptionIndex < optionElements.length) {
-      const correctElement = optionElements[correctOptionIndex];
-      correctElement.classList.add('ai-correct-answer');
+    // Highlight all correct answers
+    indices.forEach((correctOptionIndex) => {
+      if (correctOptionIndex >= 0 && correctOptionIndex < optionElements.length) {
+        const correctElement = optionElements[correctOptionIndex];
+        correctElement.classList.add('ai-correct-answer');
 
-      // Apply inline styles - green background with white text
-      correctElement.style.backgroundColor = '#22c55e';
-      correctElement.style.border = '3px solid #16a34a';
-      correctElement.style.borderRadius = '8px';
-      correctElement.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.2)';
-      correctElement.style.color = 'white';
+        // Apply inline styles - green background with white text
+        correctElement.style.backgroundColor = '#22c55e';
+        correctElement.style.border = '3px solid #16a34a';
+        correctElement.style.borderRadius = '8px';
+        correctElement.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.2)';
+        correctElement.style.color = 'white';
 
-      // Make sure all text inside is white
-      const textElements = correctElement.querySelectorAll('*');
-      textElements.forEach(el => {
-        el.style.color = 'white';
-      });
+        // Make sure all text inside is white
+        const textElements = correctElement.querySelectorAll('*');
+        textElements.forEach(el => {
+          el.style.color = 'white';
+        });
 
-      console.log(`✅ Highlighted option ${correctOptionIndex} as correct`);
-    } else {
-      console.log(`❌ Invalid option index: ${correctOptionIndex} (total options: ${optionElements.length})`);
-    }
+        console.log(`✅ Highlighted option ${correctOptionIndex} as correct`);
+      } else {
+        console.log(`❌ Invalid option index: ${correctOptionIndex} (total options: ${optionElements.length})`);
+      }
+    });
 
     console.log('=== Highlight Complete ===\n');
 
@@ -443,19 +506,28 @@ async function handleButtonClick(button, modelType, originalText) {
   }
 
   try {
-    // Send message to background script with model type
+    // Send message to background script with model type and multiple-answer info
     const response = await chrome.runtime.sendMessage({
       action: 'getAnswer',
       question: questionData.question,
       options: questionData.options.map(opt => opt.text),
-      modelType: modelType
+      modelType: modelType,
+      isMultipleAnswer: questionData.isMultipleAnswer,
+      requiredAnswers: questionData.requiredAnswers
     });
 
     console.log('AI Response received:', response);
 
     if (response.success) {
-      highlightCorrectAnswer(response.answerIndex);
-      button.innerHTML = '✅ Answer Highlighted';
+      // Handle both single answer (number) and multiple answers (array)
+      const answerIndices = Array.isArray(response.answerIndex) ? response.answerIndex : [response.answerIndex];
+      highlightCorrectAnswer(answerIndices);
+
+      const answerText = questionData.isMultipleAnswer
+        ? `✅ ${answerIndices.length} Answers Highlighted`
+        : '✅ Answer Highlighted';
+
+      button.innerHTML = answerText;
       setTimeout(() => {
         button.innerHTML = originalText;
         button.disabled = false;

@@ -14,20 +14,26 @@ End.
 `
 const temperature = 0;
 const top_p = 1.0;
-const max_tokens = 500;
+const max_tokens = 2000; // Increased for Gemini compatibility
 const presence_penalty = 0;
 const frequency_penalty = 0;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getAnswer') {
-    handleGetAnswer(request.question, request.options, request.modelType)
+    handleGetAnswer(
+      request.question,
+      request.options,
+      request.modelType,
+      request.isMultipleAnswer,
+      request.requiredAnswers
+    )
       .then(result => sendResponse(result))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Keep message channel open for async response
   }
 });
 
-async function handleGetAnswer(question, options, modelType) {
+async function handleGetAnswer(question, options, modelType, isMultipleAnswer = false, requiredAnswers = 1) {
   try {
     // Get settings from storage
     const settings = await chrome.storage.sync.get([
@@ -42,13 +48,13 @@ async function handleGetAnswer(question, options, modelType) {
       if (!apiKey) {
         throw new Error('OpenAI API key not configured. Please set it in the extension popup.');
       }
-      answerIndex = await getAnswerFromOpenAI(question, options, apiKey);
+      answerIndex = await getAnswerFromOpenAI(question, options, apiKey, isMultipleAnswer, requiredAnswers);
     } else if (modelType === 'gemini') {
       const apiKey = settings.geminiApiKey;
       if (!apiKey) {
         throw new Error('Gemini API key not configured. Please set it in the extension popup.');
       }
-      answerIndex = await getAnswerFromGemini(question, options, apiKey);
+      answerIndex = await getAnswerFromGemini(question, options, apiKey, isMultipleAnswer, requiredAnswers);
     } else {
       throw new Error('Unknown model type: ' + modelType);
     }
@@ -60,7 +66,7 @@ async function handleGetAnswer(question, options, modelType) {
   }
 }
 
-async function getAnswerFromGemini(question, options, apiKey) {
+async function getAnswerFromGemini(question, options, apiKey, isMultipleAnswer = false, requiredAnswers = 1) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   // Format options with letters
@@ -68,7 +74,20 @@ async function getAnswerFromGemini(question, options, apiKey) {
     `${String.fromCharCode(65 + idx)}. ${opt}`
   ).join('\n');
 
-  const prompt = `Answer this question with ONLY the letter (A, B, C, or D). No explanation.
+  let prompt;
+  if (isMultipleAnswer) {
+    prompt = `This is a multiple-answer question. You must select exactly ${requiredAnswers} correct answer(s).
+
+Answer with ONLY the letters separated by commas (e.g., "A,B" or "A, C, D"). No explanation, no extra text.
+
+Question: ${question}
+
+Options:
+${formattedOptions}
+
+Answer with only the ${requiredAnswers} correct letter(s) separated by commas:`;
+  } else {
+    prompt = `Answer this question with ONLY the letter (A, B, C, or D). No explanation.
 
 Question: ${question}
 
@@ -76,6 +95,7 @@ Options:
 ${formattedOptions}
 
 Answer with only the letter:`;
+  }
 
   const requestBody = {
     contents: [{
@@ -85,10 +105,8 @@ Answer with only the letter:`;
     }],
     generationConfig: {
       temperature: temperature,
-      top_p: top_p,
-      max_tokens: max_tokens,
-      presence_penalty: presence_penalty,
-      frequency_penalty: frequency_penalty,
+      topP: top_p,
+      maxOutputTokens: max_tokens
     },
     safetySettings: [
       {
@@ -179,20 +197,34 @@ Answer with only the letter:`;
 
   console.log('Gemini answer text:', answerText);
 
-  // Extract letter from response (handles "A", "A.", "Answer: A", etc.)
-  const letterMatch = answerText.match(/[ABCD]/);
-  if (!letterMatch) {
-    throw new Error('Invalid answer format from Gemini: ' + answerText);
+  if (isMultipleAnswer) {
+    // Extract multiple letters from response (handles "A,B", "A, B", "A,C,D", etc.)
+    const letterMatches = answerText.match(/[ABCD]/g);
+    if (!letterMatches || letterMatches.length === 0) {
+      throw new Error('Invalid answer format from Gemini: ' + answerText);
+    }
+
+    // Convert letters to indices and remove duplicates
+    const answerIndices = [...new Set(letterMatches)].map(letter => letter.charCodeAt(0) - 65);
+
+    console.log('Gemini answers:', letterMatches.join(','), 'Indices:', answerIndices);
+    return answerIndices;
+  } else {
+    // Extract single letter from response (handles "A", "A.", "Answer: A", etc.)
+    const letterMatch = answerText.match(/[ABCD]/);
+    if (!letterMatch) {
+      throw new Error('Invalid answer format from Gemini: ' + answerText);
+    }
+
+    const answerLetter = letterMatch[0];
+    const answerIndex = answerLetter.charCodeAt(0) - 65; // Convert A->0, B->1, etc.
+
+    console.log('Gemini answer:', answerLetter, 'Index:', answerIndex);
+    return answerIndex;
   }
-
-  const answerLetter = letterMatch[0];
-  const answerIndex = answerLetter.charCodeAt(0) - 65; // Convert A->0, B->1, etc.
-
-  console.log('Gemini answer:', answerLetter, 'Index:', answerIndex);
-  return answerIndex;
 }
 
-async function getAnswerFromOpenAI(question, options, apiKey) {
+async function getAnswerFromOpenAI(question, options, apiKey, isMultipleAnswer = false, requiredAnswers = 1) {
   const url = 'https://api.openai.com/v1/chat/completions';
 
   // Format options with letters
@@ -200,7 +232,20 @@ async function getAnswerFromOpenAI(question, options, apiKey) {
     `${String.fromCharCode(65 + idx)}. ${opt}`
   ).join('\n');
 
-  const prompt = `Answer this question with ONLY the letter (A, B, C, or D). No explanation.
+  let prompt;
+  if (isMultipleAnswer) {
+    prompt = `This is a multiple-answer question. You must select exactly ${requiredAnswers} correct answer(s).
+
+Answer with ONLY the letters separated by commas (e.g., "A,B" or "A, C, D"). No explanation, no extra text.
+
+Question: ${question}
+
+Options:
+${formattedOptions}
+
+Answer with only the ${requiredAnswers} correct letter(s) separated by commas:`;
+  } else {
+    prompt = `Answer this question with ONLY the letter (A, B, C, or D). No explanation.
 
 Question: ${question}
 
@@ -208,6 +253,7 @@ Options:
 ${formattedOptions}
 
 Answer with only the letter:`;
+  }
 
   const requestBody = {
     model: 'gpt-4o-mini',
@@ -279,16 +325,30 @@ Answer with only the letter:`;
 
   console.log('OpenAI raw answer:', answerText);
 
-  // Extract letter from response
-  const letterMatch = answerText.match(/[ABCD]/);
-  if (!letterMatch) {
-    throw new Error('Invalid answer format from OpenAI: ' + answerText);
+  if (isMultipleAnswer) {
+    // Extract multiple letters from response (handles "A,B", "A, B", "A,C,D", etc.)
+    const letterMatches = answerText.match(/[ABCD]/g);
+    if (!letterMatches || letterMatches.length === 0) {
+      throw new Error('Invalid answer format from OpenAI: ' + answerText);
+    }
+
+    // Convert letters to indices and remove duplicates
+    const answerIndices = [...new Set(letterMatches)].map(letter => letter.charCodeAt(0) - 65);
+
+    console.log('OpenAI answers:', letterMatches.join(','), 'Indices:', answerIndices, 'Model: gpt-4o-mini');
+    return answerIndices;
+  } else {
+    // Extract single letter from response
+    const letterMatch = answerText.match(/[ABCD]/);
+    if (!letterMatch) {
+      throw new Error('Invalid answer format from OpenAI: ' + answerText);
+    }
+
+    const answerLetter = letterMatch[0];
+    const answerIndex = answerLetter.charCodeAt(0) - 65;
+
+    console.log('OpenAI answer:', answerLetter, 'Index:', answerIndex, 'Model: gpt-4o-mini');
+    return answerIndex;
   }
-
-  const answerLetter = letterMatch[0];
-  const answerIndex = answerLetter.charCodeAt(0) - 65;
-
-  console.log('OpenAI answer:', answerLetter, 'Index:', answerIndex, 'Model: gpt-4o-mini');
-  return answerIndex;
 }
 
