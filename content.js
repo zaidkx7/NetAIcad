@@ -387,44 +387,44 @@ function highlightCorrectAnswer(correctOptionIndex) {
   }
 }
 
-// Function to create the helper buttons (simple and advanced)
+// Function to create the helper buttons (GPT and Gemini)
 function createHelperButton(targetDocument = document) {
   // Check if buttons already exist
-  if (document.getElementById('netacad-ai-helper-btn-simple')) {
+  if (document.getElementById('netacad-ai-helper-btn-gpt')) {
     console.log('Buttons already exist in main document');
     return;
   }
 
-  if (targetDocument !== document && targetDocument.getElementById('netacad-ai-helper-btn-simple')) {
+  if (targetDocument !== document && targetDocument.getElementById('netacad-ai-helper-btn-gpt')) {
     console.log('Buttons already exist in iframe');
     return;
   }
 
-  // Create Simple Button (Green)
-  const simpleButton = targetDocument.createElement('button');
-  simpleButton.id = 'netacad-ai-helper-btn-simple';
-  simpleButton.innerHTML = '🤖 Get AI Answer';
-  simpleButton.className = 'ai-helper-button ai-helper-button-simple';
+  // Create GPT Button (Blue)
+  const gptButton = targetDocument.createElement('button');
+  gptButton.id = 'netacad-ai-helper-btn-gpt';
+  gptButton.innerHTML = '🤖 Get Answer from GPT';
+  gptButton.className = 'ai-helper-button ai-helper-button-gpt';
 
-  // Create Advanced Button (Red)
-  const advancedButton = targetDocument.createElement('button');
-  advancedButton.id = 'netacad-ai-helper-btn-advanced';
-  advancedButton.innerHTML = '🔥 Advanced AI (Code/Math)';
-  advancedButton.className = 'ai-helper-button ai-helper-button-advanced';
+  // Create Gemini Button (Purple)
+  const geminiButton = targetDocument.createElement('button');
+  geminiButton.id = 'netacad-ai-helper-btn-gemini';
+  geminiButton.innerHTML = '✨ Get Answer from Gemini';
+  geminiButton.className = 'ai-helper-button ai-helper-button-gemini';
 
-  // Simple button click handler
-  simpleButton.addEventListener('click', async () => {
-    await handleButtonClick(simpleButton, 'simple', '🤖 Get AI Answer');
+  // GPT button click handler
+  gptButton.addEventListener('click', async () => {
+    await handleButtonClick(gptButton, 'gpt', '🤖 Get Answer from GPT');
   });
 
-  // Advanced button click handler
-  advancedButton.addEventListener('click', async () => {
-    await handleButtonClick(advancedButton, 'coding', '🔥 Advanced AI (Code/Math)');
+  // Gemini button click handler
+  geminiButton.addEventListener('click', async () => {
+    await handleButtonClick(geminiButton, 'gemini', '✨ Get Answer from Gemini');
   });
 
   // Add buttons to the target document body
-  targetDocument.body.appendChild(simpleButton);
-  targetDocument.body.appendChild(advancedButton);
+  targetDocument.body.appendChild(gptButton);
+  targetDocument.body.appendChild(geminiButton);
   console.log('AI helper buttons added to', targetDocument === document ? 'main page' : 'iframe');
 }
 
@@ -483,7 +483,7 @@ function checkForQuiz() {
   const appRoot = document.querySelector('app-root');
   console.log('app-root element:', appRoot);
 
-  const buttonsExist = document.getElementById('netacad-ai-helper-btn-simple');
+  const buttonsExist = document.getElementById('netacad-ai-helper-btn-gpt');
   console.log('Buttons exist:', buttonsExist);
 
   if (appRoot && !buttonsExist) {
@@ -504,7 +504,7 @@ function tryCheckForQuiz() {
 
   checkForQuiz();
 
-  if (checkAttempts < maxAttempts && !document.getElementById('netacad-ai-helper-btn-simple')) {
+  if (checkAttempts < maxAttempts && !document.getElementById('netacad-ai-helper-btn-gpt')) {
     setTimeout(tryCheckForQuiz, 500);
   }
 }
@@ -519,7 +519,7 @@ function initialize() {
   // Also observe for dynamic content changes (for SPA navigation)
   const observer = new MutationObserver((mutations) => {
     // Only check if buttons don't exist
-    if (!document.getElementById('netacad-ai-helper-btn-simple')) {
+    if (!document.getElementById('netacad-ai-helper-btn-gpt')) {
       const appRoot = document.querySelector('app-root');
       if (appRoot) {
         console.log('app-root detected via mutation observer');

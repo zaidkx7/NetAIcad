@@ -18,18 +18,6 @@ const max_tokens = 500;
 const presence_penalty = 0;
 const frequency_penalty = 0;
 
-// OpenRouter Model Mapping
-const OPENROUTER_MODELS = {
-  "DeepSeek": "deepseek/deepseek-v3.2-exp",
-  "GPT-5 Pro": "openai/gpt-5-pro",
-  "Claude Sonnet 4.5": "anthropic/claude-sonnet-4.5",
-  "Qwen3 Coder Plus": "qwen/qwen3-coder-plus",
-  "GLM": "z-ai/glm-4.6",
-  "Grok 4 Fast": "x-ai/grok-4-fast",
-  "GPT-5 Codex": "openai/gpt-5-codex",
-  "Qwen3 Coder Flash": "qwen/qwen3-coder-flash"
-};
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getAnswer') {
     handleGetAnswer(request.question, request.options, request.modelType)
@@ -39,58 +27,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function handleGetAnswer(question, options, modelType = 'simple') {
+async function handleGetAnswer(question, options, modelType) {
   try {
     // Get settings from storage
     const settings = await chrome.storage.sync.get([
-      'simpleModel', 
-      'codingModel', 
-      'openRouterApiKey',
-      'aiProvider',
-      'apiKey'
+      'geminiApiKey',
+      'openAiApiKey'
     ]);
 
-    // Determine which model to use based on modelType
-    let provider, modelId, apiKey;
-
-    if (modelType === 'simple') {
-      modelId = settings.simpleModel;
-    } else if (modelType === 'coding') {
-      modelId = settings.codingModel;
-    }
-
-    // Check if it's an OpenRouter model
-    if (modelId && OPENROUTER_MODELS[modelId]) {
-      provider = 'openrouter';
-      apiKey = settings.openRouterApiKey;
-      if (!apiKey) {
-        throw new Error('OpenRouter API key not configured. Please set it in the extension popup.');
-      }
-    } else if (modelId === 'groq' || modelId === 'gemini') {
-      // Legacy provider support
-      provider = modelId;
-      apiKey = settings.apiKey;
-      if (!apiKey) {
-        throw new Error('API key not configured. Please set it in the extension popup.');
-      }
-    } else {
-      // Fallback to old provider system if no model selected
-      provider = settings.aiProvider || 'groq';
-      apiKey = settings.apiKey;
-      if (!apiKey) {
-        throw new Error('API key not configured. Please set it in the extension popup.');
-      }
-    }
-
     let answerIndex;
-    if (provider === 'gemini') {
+
+    if (modelType === 'gpt') {
+      const apiKey = settings.openAiApiKey;
+      if (!apiKey) {
+        throw new Error('OpenAI API key not configured. Please set it in the extension popup.');
+      }
+      answerIndex = await getAnswerFromOpenAI(question, options, apiKey);
+    } else if (modelType === 'gemini') {
+      const apiKey = settings.geminiApiKey;
+      if (!apiKey) {
+        throw new Error('Gemini API key not configured. Please set it in the extension popup.');
+      }
       answerIndex = await getAnswerFromGemini(question, options, apiKey);
-    } else if (provider === 'groq') {
-      answerIndex = await getAnswerFromGroq(question, options, apiKey);
-    } else if (provider === 'openrouter') {
-      answerIndex = await getAnswerFromOpenRouter(question, options, modelId, apiKey);
     } else {
-      throw new Error('Unknown AI provider: ' + provider);
+      throw new Error('Unknown model type: ' + modelType);
     }
 
     return { success: true, answerIndex: answerIndex };
@@ -232,8 +192,8 @@ Answer with only the letter:`;
   return answerIndex;
 }
 
-async function getAnswerFromOpenRouter(question, options, modelName, apiKey) {
-  const url = 'https://openrouter.ai/api/v1/chat/completions';
+async function getAnswerFromOpenAI(question, options, apiKey) {
+  const url = 'https://api.openai.com/v1/chat/completions';
 
   // Format options with letters
   const formattedOptions = options.map((opt, idx) =>
@@ -250,7 +210,7 @@ ${formattedOptions}
 Answer with only the letter:`;
 
   const requestBody = {
-    model: OPENROUTER_MODELS[modelName],
+    model: 'gpt-4o-mini',
     messages: [
       {
         role: 'system',
@@ -279,31 +239,24 @@ Answer with only the letter:`;
 
   const data = await response.json();
 
-  console.log('OpenRouter full response:', JSON.stringify(data, null, 2));
+  console.log('OpenAI full response:', JSON.stringify(data, null, 2));
   console.log('Response status:', response.status, response.statusText);
 
   if (!response.ok) {
-    console.error('OpenRouter API error response:', data);
-    throw new Error(`OpenRouter API error: ${data.error?.message || response.statusText}`);
+    console.error('OpenAI API error response:', data);
+    throw new Error(`OpenAI API error: ${data.error?.message || response.statusText}`);
   }
-
-  // Check response structure
-  console.log('data.choices:', data.choices);
-  console.log('data.choices[0]:', data.choices?.[0]);
-  console.log('data.choices[0].message:', data.choices?.[0]?.message);
-  console.log('data.choices[0].message.content:', data.choices?.[0]?.message?.content);
 
   const rawContent = data.choices?.[0]?.message?.content;
   const answerText = rawContent?.trim().toUpperCase();
 
   if (!answerText) {
-    console.error('Empty or undefined answer text from OpenRouter');
+    console.error('Empty or undefined answer text from OpenAI');
     console.error('Raw content:', rawContent);
     console.error('Finish reason:', data.choices?.[0]?.finish_reason);
     console.error('Full response data:', JSON.stringify(data, null, 2));
 
-    // More detailed error message
-    let errorDetails = 'No answer received from OpenRouter. ';
+    let errorDetails = 'No answer received from OpenAI. ';
     if (!data.choices) {
       errorDetails += 'Response has no choices array. ';
     } else if (data.choices.length === 0) {
@@ -316,98 +269,26 @@ Answer with only the letter:`;
       errorDetails += 'Message content is empty/whitespace. ';
     }
 
-    // Check if token limit was hit
     if (data.choices[0]?.finish_reason === 'length') {
-      errorDetails += 'Response was cut off due to token limit (increase max_tokens). ';
+      errorDetails += 'Response was cut off due to token limit. ';
     }
 
     errorDetails += 'Full response: ' + JSON.stringify(data);
-
     throw new Error(errorDetails);
   }
 
-  console.log('OpenRouter raw answer:', answerText);
+  console.log('OpenAI raw answer:', answerText);
 
   // Extract letter from response
   const letterMatch = answerText.match(/[ABCD]/);
   if (!letterMatch) {
-    throw new Error('Invalid answer format from OpenRouter: ' + answerText);
-  }
-
-  const answerLetter = letterMatch[0];
-  const answerIndex = answerLetter.charCodeAt(0) - 65; // Convert A->0, B->1, etc.
-
-  console.log('OpenRouter answer:', answerLetter, 'Index:', answerIndex, 'Model:', modelName);
-  return answerIndex;
-}
-
-async function getAnswerFromGroq(question, options, apiKey) {
-  const url = 'https://api.groq.com/openai/v1/chat/completions';
-
-  // Format options with letters
-  const formattedOptions = options.map((opt, idx) =>
-    `${String.fromCharCode(65 + idx)}. ${opt}`
-  ).join('\n');
-
-  const prompt = `Answer this question with ONLY the letter (A, B, C, or D). No explanation.
-
-Question: ${question}
-
-Options:
-${formattedOptions}
-
-Answer with only the letter:`;
-
-  const requestBody = {
-    model: 'llama-3.3-70b-versatile', // Fast and accurate model
-    messages: [
-      {
-        role: 'system',
-        content: SYSTEM_PROMPT
-      },
-      {
-        role: 'user',
-        content: prompt
-      }
-    ],
-    temperature: temperature,
-    top_p: top_p,
-    max_tokens: max_tokens,
-    presence_penalty: presence_penalty,
-    frequency_penalty: frequency_penalty,
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify(requestBody)
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(`Groq API error: ${data.error?.message || response.statusText}`);
-  }
-
-  const answerText = data.choices[0]?.message?.content?.trim().toUpperCase();
-
-  if (!answerText) {
-    throw new Error('No answer received from Groq');
-  }
-
-  // Extract letter from response
-  const letterMatch = answerText.match(/[ABCD]/);
-  if (!letterMatch) {
-    throw new Error('Invalid answer format from Groq: ' + answerText);
+    throw new Error('Invalid answer format from OpenAI: ' + answerText);
   }
 
   const answerLetter = letterMatch[0];
   const answerIndex = answerLetter.charCodeAt(0) - 65;
 
-  console.log('Groq answer:', answerLetter, 'Index:', answerIndex);
+  console.log('OpenAI answer:', answerLetter, 'Index:', answerIndex, 'Model: gpt-4o-mini');
   return answerIndex;
 }
 
